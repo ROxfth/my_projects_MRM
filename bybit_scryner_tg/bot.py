@@ -11,13 +11,13 @@ logger: logging.Logger = logging.getLogger(__name__)
 class TelegramBot:
     """Класс для работы с Telegram-ботом."""
 
-    def __init__(self, token: str, chat_id: str) -> None:
+    def __init__(self, token: str, user_tracker) -> None:
         """Инициализация бота."""
         logger.info("Инициализация TelegramBot")
         self.bot = Bot(token=token)
         self.dp = Dispatcher()
-        self.chat_id = chat_id
         self.threshold_factor = 8.0  # Множитель для крупных объёмов по умолчанию
+        self.user_tracker = user_tracker  # Добавляем трекер пользователей
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -25,6 +25,9 @@ class TelegramBot:
         @self.dp.message(Command(commands=['start']))
         async def send_welcome(message: types.Message) -> None:
             """Обработчик команды /start."""
+            # Регистрируем нового пользователя
+            self.user_tracker.add_user(message.chat.id)
+
             user_name = message.from_user.first_name or "Пользователь"
             welcome_text = (
                 f"<b>Привет, {user_name}!</b>\n\n"
@@ -59,7 +62,8 @@ class TelegramBot:
         async def handle_callback(callback: types.CallbackQuery) -> None:
             """Обработчик инлайн-кнопок."""
             data = callback.data
-            logger.info(f"Получен callback с данными: {data}")
+            chat_id = callback.message.chat.id  # Получаем chat_id из callback
+            logger.info(f"Получен callback с данными: {data} от {callback.from_user.id}")
             current_text = callback.message.text
             current_reply_markup = callback.message.reply_markup
 
@@ -93,9 +97,9 @@ class TelegramBot:
                         )
                     logger.info(f"Установлен множитель {threshold} пользователем {callback.from_user.id}")
 
-                elif data == "top_10_pairs":
+                elif data in ["top_10_pairs", "top_50_pairs", "top_100_pairs", "all_pairs"]:
                     new_text = (
-                        "<b>Запущен расчёт крупных объёмов для 10 пар с наибольшим объёмом торгов.</b>\n"
+                        f"<b>Запущен расчёт крупных объёмов для {data.replace('_', ' ')}.</b>\n"
                         "Результаты будут отправлены в этот чат после обработки.\n"
                         "<b>Вернись к меню:</b>"
                     )
@@ -105,61 +109,10 @@ class TelegramBot:
                             new_text, reply_markup=new_reply_markup, parse_mode="HTML"
                         )
                     await callback.message.bot.send_message(
-                        self.chat_id, "<b>Обработка начата, ждите результатов...</b>",
+                        chat_id, "<b>Обработка начата, ждите результатов...</b>",
                         reply_markup=self._get_menu_button(), parse_mode="HTML"
                     )
-                    await self.on_calculate_callback("top_10_pairs", self.threshold_factor)
-
-                elif data == "top_50_pairs":
-                    new_text = (
-                        "<b>Запущен расчёт крупных объёмов для 50 пар с наибольшим объёмом торгов.</b>\n"
-                        "Результаты будут отправлены в этот чат после обработки.\n"
-                        "<b>Вернись к меню:</b>"
-                    )
-                    new_reply_markup = self._get_menu_button()
-                    if current_text != new_text or current_reply_markup != new_reply_markup:
-                        await callback.message.edit_text(
-                            new_text, reply_markup=new_reply_markup, parse_mode="HTML"
-                        )
-                    await callback.message.bot.send_message(
-                        self.chat_id, "<b>Обработка начата, ждите результатов...</b>",
-                        reply_markup=self._get_menu_button(), parse_mode="HTML"
-                    )
-                    await self.on_calculate_callback("top_50_pairs", self.threshold_factor)
-
-                elif data == "top_100_pairs":
-                    new_text = (
-                        "<b>Запущен расчёт крупных объёмов для 100 пар с наибольшим объёмом торгов.</b>\n"
-                        "Результаты будут отправлены в этот чат после обработки.\n"
-                        "<b>Вернись к меню:</b>"
-                    )
-                    new_reply_markup = self._get_menu_button()
-                    if current_text != new_text or current_reply_markup != new_reply_markup:
-                        await callback.message.edit_text(
-                            new_text, reply_markup=new_reply_markup, parse_mode="HTML"
-                        )
-                    await callback.message.bot.send_message(
-                        self.chat_id, "<b>Обработка начата, ждите результатов...</b>",
-                        reply_markup=self._get_menu_button(), parse_mode="HTML"
-                    )
-                    await self.on_calculate_callback("top_100_pairs", self.threshold_factor)
-
-                elif data == "all_pairs":
-                    new_text = (
-                        "<b>Запущен расчёт крупных объёмов для всех пар.</b>\n"
-                        "Результаты будут отправлены в этот чат после обработки.\n"
-                        "<b>Вернись к меню:</b>"
-                    )
-                    new_reply_markup = self._get_menu_button()
-                    if current_text != new_text or current_reply_markup != new_reply_markup:
-                        await callback.message.edit_text(
-                            new_text, reply_markup=new_reply_markup, parse_mode="HTML"
-                        )
-                    await callback.message.bot.send_message(
-                        self.chat_id, "<b>Обработка начата, ждите результатов...</b>",
-                        reply_markup=self._get_menu_button(), parse_mode="HTML"
-                    )
-                    await self.on_calculate_callback("all_pairs", self.threshold_factor)
+                    await self.on_calculate_callback(data, self.threshold_factor, chat_id)
 
                 elif data == "back":
                     new_text = "<b>Выбери действие:</b>"
@@ -224,11 +177,11 @@ class TelegramBot:
         buttons.append([InlineKeyboardButton(text="МЕНЮ", callback_data="menu")])
         return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    async def send_large_volumes(self, density_list: list[dict]) -> None:
-        """Отправляет данные о крупных объёмах в Telegram."""
+    async def send_large_volumes(self, density_list: list[dict], chat_id: int) -> None:
+        """Отправляет данные о крупных объёмах в Telegram конкретному пользователю."""
         if not density_list:
             await self.bot.send_message(
-                self.chat_id,
+                chat_id,
                 "<b>Крупные объёмы не найдены.</b>",
                 reply_markup=self._get_menu_button(),
                 parse_mode="HTML"
@@ -273,14 +226,27 @@ class TelegramBot:
         try:
             for message in messages:
                 await self.bot.send_message(
-                    self.chat_id,
+                    chat_id,
                     message,
                     reply_markup=self._get_menu_button(),
                     parse_mode="HTML"
                 )
-            logger.info(f"Отправлено {len(messages)} сообщений о крупных объёмах в Telegram")
+            logger.info(f"Отправлено {len(messages)} сообщений о крупных объёмах в чат {chat_id}")
         except Exception as e:
-            logger.error(f"Ошибка при отправке уведомления: {str(e)}")
+            logger.error(f"Ошибка при отправке уведомления в чат {chat_id}: {str(e)}")
+
+    async def send_report_to_owner(self, owner_chat_id: int) -> None:
+        """Отправляет отчёт о пользователях владельцу бота."""
+        report = self.user_tracker.generate_report()
+        try:
+            await self.bot.send_message(
+                owner_chat_id,
+                report,
+                parse_mode="HTML"
+            )
+            logger.info(f"Отчёт о пользователях отправлен владельцу в чат {owner_chat_id}")
+        except Exception as e:
+            logger.error(f"Ошибка при отправке отчёта владельцу в чат {owner_chat_id}: {str(e)}")
 
     async def start(self) -> None:
         """Запускает поллинг бота."""

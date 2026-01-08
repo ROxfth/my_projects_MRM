@@ -1,0 +1,53 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyInterpreterInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="aiodns" />
+          <option value="aiofiles" />
+          <option value="aiogram" />
+          <option value="aiohappyeyeballs" />
+          <option value="aiohttp" />
+          <option value="aiosignal" />
+          <option value="annotated-types" />
+          <option value="anyio" />
+          <option value="asyncio" />
+          <option value="attrs" />
+          <option value="ccxt" />
+          <option value="certifi" />
+          <option value="cffi" />
+          <option value="charset-normalizer" />
+          <option value="cryptography" />
+          <option value="dotenv" />
+          <option value="frozenlist" />
+          <option value="h11" />
+          <option value="httpcore" />
+          <option value="httpx" />
+          <option value="idna" />
+          <option value="magic-filter" />
+          <option value="multidict" />
+          <option value="numpy" />
+          <option value="propcache" />
+          <option value="pycares" />
+          <option value="pycparser" />
+          <option value="pydantic" />
+          <option value="pydantic_core" />
+          <option value="python-dotenv" />
+          <option value="python-telegram-bot" />
+          <option value="requests" />
+          <option value="setuptools" />
+          <option value="sniffio" />
+          <option value="tabulate" />
+          <option value="telegram" />
+          <option value="typing-inspection" />
+          <option value="typing_extensions" />
+          <option value="urllib3" />
+          <option value="yarl" />
+          <option value="apscheduler" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
